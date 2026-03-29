@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnostic Enseigne Cassée — Atelier Gambetta</title>
+<meta name="description" content="Votre enseigne est cassée ou ne s'allume plus ? Faites votre auto-diagnostic en 2 minutes. Atelier Gambetta, expert en réparation d'enseignes à Paris depuis 1975.">
+<meta name="keywords" content="enseigne cassée, enseigne qui ne s'allume plus, réparation enseigne, enseigne lumineuse cassée, néon cassé, réparation enseigne Paris">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231A3D4D'/><text x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%23D4952A' font-size='16' font-weight='bold' font-family='sans-serif'>AG</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:#F4F8FA;color:#1A3D4D}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-thumb{background:#CDD3D9;border-radius:3px}
+@keyframes fadeSlideIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeSlideOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-20px)}}
+@keyframes progressFill{from{width:0}to{width:var(--target-width)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(212,149,42,0.4)}70%{box-shadow:0 0 0 12px rgba(212,149,42,0)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes checkmark{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes glow{0%,100%{text-shadow:0 0 20px rgba(232,168,56,0.3)}50%{text-shadow:0 0 40px rgba(232,168,56,0.7)}}
+input,textarea{font-family:'Inter',sans-serif}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState, useEffect, useRef, useCallback} = React;
+
+/* ═══════════ DESIGN TOKENS ═══════════ */
+const T = {
+  blue:"#1A3D4D", blueDark:"#122C38", blueLight:"#2A5A6E", blueVeryLight:"#E8F0F3", bluePale:"#F4F8FA",
+  gold:"#D4952A", goldLight:"#F5E6CC", goldBright:"#E8A838",
+  white:"#FFFFFF", gray50:"#FAFBFC", gray100:"#F1F3F5", gray200:"#E2E6EA",
+  gray300:"#CDD3D9", gray400:"#9BA5AE", gray500:"#6B7580", gray600:"#4A5260",
+  green:"#22A06B", greenLight:"#E3FCEF", greenDark:"#1A7A52",
+  orange:"#E8722A", orangeLight:"#FFF4E6",
+  red:"#DE350B", redLight:"#FFEBE6",
+};
+
+/* ═══════════ DECISION TREE ═══════════ */
+const TREE = {
+  // TYPE SELECTION
+  type: {
+    id:"type", question:"Quel type d'enseigne avez-vous ?", subtitle:"Sélectionnez votre type d'enseigne pour un diagnostic précis", type:"choice",
+    choices:[
+      {id:"lumineux", label:"Enseigne lumineuse", sublabel:"LED, néon, caisson lumineux", icon:"💡", next:"lumineux_symptome"},
+      {id:"store", label:"Store & Lambrequin", sublabel:"Store banne, mécanisme, toile", icon:"🏪", next:"store_symptome"},
+      {id:"vitrophanie", label:"Vitrophanie & Stickers", sublabel:"Film vitrine, stickers, décoration", icon:"🪟", next:"vitrophanie_symptome"},
+      {id:"signaletique", label:"Signalétique", sublabel:"Panneaux, totems, affichage", icon:"🪧", next:"signaletique_symptome"},
+    ]
+  },
+
+  // ── ENSEIGNE LUMINEUSE ──
+  lumineux_symptome: {
+    id:"lumineux_symptome", question:"Quel est le symptôme principal ?", subtitle:"Décrivez le problème que vous observez", type:"choice",
+    choices:[
+      {id:"eteint", label:"Elle est complètement éteinte", sublabel:"Aucune lumière visible", icon:"⚫", next:"lumineux_etendue"},
+      {id:"clignote", label:"Elle clignote ou vacille", sublabel:"Lumière instable, flashs", icon:"⚡", next:"lumineux_cligno"},
+      {id:"faible", label:"La lumière est plus faible", sublabel:"Moins lumineuse qu'avant", icon:"🔅", next:"lumineux_zone"},
+      {id:"choc", label:"Suite à un choc ou intempérie", sublabel:"Chute, impact, tempête", icon:"💥", next:"lumineux_zone"},
+    ]
+  },
+  lumineux_etendue: {
+    id:"lumineux_etendue", question:"Quelle partie ne s'allume plus ?", subtitle:"Soyez le plus précis possible", type:"choice",
+    choices:[
+      {id:"tout", label:"Toute l'enseigne", sublabel:"Rien ne s'allume du tout", icon:"🔲", next:"lumineux_duree"},
+      {id:"plusieurs", label:"Plusieurs lettres", sublabel:"Une partie de l'enseigne", icon:"🔡", next:"lumineux_duree"},
+      {id:"une", label:"Une seule lettre", sublabel:"Uniquement un caractère", icon:"🔤", next:"lumineux_duree"},
+      {id:"segment", label:"Une partie d'une lettre", sublabel:"Un segment, un côté", icon:"▪️", next:"lumineux_duree"},
+    ]
+  },
+  lumineux_cligno: {
+    id:"lumineux_cligno", question:"Le clignotement est…", subtitle:"", type:"choice",
+    choices:[
+      {id:"permanent", label:"Permanent en continu", sublabel:"Depuis le début, ça ne s'arrête pas", icon:"🔁", next:"lumineux_duree"},
+      {id:"intermittent", label:"Par intermittence", sublabel:"Parfois ça marche, parfois non", icon:"🔀", next:"lumineux_duree"},
+      {id:"demarrage", label:"Au démarrage uniquement", sublabel:"Ça clignote puis ça s'arrête", icon:"▶️", next:"lumineux_duree"},
+    ]
+  },
+  lumineux_zone: {
+    id:"lumineux_zone", question:"C'est sur quelle zone ?", subtitle:"", type:"choice",
+    choices:[
+      {id:"tout", label:"Toute l'enseigne", sublabel:"Problème généralisé", icon:"🔲", next:"lumineux_duree"},
+      {id:"partielle", label:"Une zone précise", sublabel:"Localisé sur une partie", icon:"📍", next:"lumineux_duree"},
+    ]
+  },
+  lumineux_duree: {
+    id:"lumineux_duree", question:"Depuis combien de temps ?", subtitle:"Cela nous aide à évaluer l'urgence d'intervention", type:"choice",
+    choices:[
+      {id:"24h", label:"Moins de 24h", sublabel:"C'est tout récent", icon:"⏰", next:"securite", urgent:true},
+      {id:"jours", label:"Quelques jours", sublabel:"2 à 7 jours", icon:"📅", next:"securite"},
+      {id:"semaines", label:"Quelques semaines", sublabel:"Plus d'une semaine", icon:"🗓️", next:"securite"},
+      {id:"mois", label:"Plus d'un mois", sublabel:"Problème ancien", icon:"📆", next:"securite"},
+    ]
+  },
+
+  // ── STORE & LAMBREQUIN ──
+  store_symptome: {
+    id:"store_symptome", question:"Quel est le problème avec votre store ?", subtitle:"", type:"choice",
+    choices:[
+      {id:"souvre_pas", label:"Il ne s'ouvre plus", sublabel:"Bloqué en position fermée", icon:"🚫", next:"store_mecanisme"},
+      {id:"ferme_pas", label:"Il ne se ferme plus", sublabel:"Bloqué en position ouverte", icon:"↔️", next:"store_mecanisme"},
+      {id:"toile", label:"La toile est abîmée", sublabel:"Déchirée, tachée, délavée", icon:"🪡", next:"store_toile"},
+      {id:"bruit", label:"Bruit anormal", sublabel:"Grincements, craquements", icon:"🔊", next:"store_duree"},
+      {id:"armature", label:"Armature / structure abîmée", sublabel:"Tordue, cassée, pliée", icon:"🔧", next:"store_duree"},
+    ]
+  },
+  store_mecanisme: {
+    id:"store_mecanisme", question:"Le mécanisme est…", subtitle:"", type:"choice",
+    choices:[
+      {id:"manivelle", label:"Manuel (à manivelle)", sublabel:"Système mécanique sans moteur", icon:"🔄", next:"store_duree"},
+      {id:"motorise", label:"Motorisé / électrique", sublabel:"Avec télécommande ou interrupteur", icon:"📡", next:"store_duree"},
+    ]
+  },
+  store_toile: {
+    id:"store_toile", question:"L'état de la toile ?", subtitle:"", type:"choice",
+    choices:[
+      {id:"dechirure", label:"Déchirure / trou", sublabel:"Tissu percé ou arraché", icon:"✂️", next:"store_duree"},
+      {id:"tache", label:"Taches importantes", sublabel:"Moisissures, traces indélébiles", icon:"💧", next:"store_duree"},
+      {id:"delave", label:"Couleurs délavées", sublabel:"Fané par le soleil", icon:"☀️", next:"store_duree"},
+    ]
+  },
+  store_duree: {
+    id:"store_duree", question:"Depuis combien de temps ?", subtitle:"", type:"choice",
+    choices:[
+      {id:"24h", label:"Moins de 24h", icon:"⏰", next:"securite", urgent:true},
+      {id:"jours", label:"Quelques jours", icon:"📅", next:"securite"},
+      {id:"semaines", label:"Quelques semaines", icon:"🗓️", next:"securite"},
+      {id:"mois", label:"Plus d'un mois", icon:"📆", next:"securite"},
+    ]
+  },
+
+  // ── VITROPHANIE ──
+  vitrophanie_symptome: {
+    id:"vitrophanie_symptome", question:"Quel est le problème sur votre vitrine ?", subtitle:"", type:"choice",
+    choices:[
+      {id:"decolle", label:"Le sticker se décolle", sublabel:"Bords qui se soulèvent", icon:"📤", next:"vitrophanie_zone"},
+      {id:"bulles", label:"Des bulles d'air", sublabel:"Sous le film ou le sticker", icon:"🫧", next:"vitrophanie_zone"},
+      {id:"dechire", label:"Déchiré ou arraché", sublabel:"Sticker endommagé", icon:"🗑️", next:"vitrophanie_zone"},
+      {id:"fane", label:"Couleurs fanées", sublabel:"Délavé, jauni, altéré", icon:"🎨", next:"vitrophanie_zone"},
+    ]
+  },
+  vitrophanie_zone: {
+    id:"vitrophanie_zone", question:"Sur combien de vitres ?", subtitle:"", type:"choice",
+    choices:[
+      {id:"une", label:"Une seule vitre", icon:"🪟", next:"securite"},
+      {id:"plusieurs", label:"Plusieurs vitres", icon:"🏬", next:"securite"},
+      {id:"devanture", label:"Toute la devanture", icon:"🏪", next:"securite"},
+    ]
+  },
+
+  // ── SIGNALÉTIQUE ──
+  signaletique_symptome: {
+    id:"signaletique_symptome", question:"Quel est le problème avec votre signalétique ?", subtitle:"", type:"choice",
+    choices:[
+      {id:"casse", label:"Support cassé / fissuré", sublabel:"Panneau, totem, plaque", icon:"💔", next:"securite"},
+      {id:"efface", label:"Texte ou impression effacé", sublabel:"Illisible, délavé", icon:"🔍", next:"securite"},
+      {id:"fixation", label:"Fixation défaillante", sublabel:"Risque de chute", icon:"⚠️", next:"securite", urgent:true},
+      {id:"maj", label:"Mise à jour du contenu", sublabel:"Nouvelles infos à afficher", icon:"✏️", next:"securite"},
+    ]
+  },
+
+  // ── SÉCURITÉ ──
+  securite: {
+    id:"securite", question:"Y a-t-il un risque de sécurité immédiat ?", subtitle:"Câbles apparents, risque de chute, danger électrique…", type:"yesno",
+    yes:{label:"Oui, c'est urgent", sublabel:"Risque pour les personnes", next:"upload", urgent:true},
+    no:{label:"Non, pas de danger", sublabel:"Pas de risque immédiat", next:"upload"},
+  },
+
+  // ── UPLOAD & FIN ──
+  upload: {id:"upload", type:"upload"},
+};
+
+const TOTAL_STEPS_ESTIMATE = 7;
+
+/* ═══════════ UTILS ═══════════ */
+const getEstimatedTime = (progress) => {
+  if(progress < 20) return "~2 min";
+  if(progress < 50) return "~1 min 30";
+  if(progress < 75) return "~1 min";
+  return "~30 sec";
+};
+
+/* ═══════════ COMPONENTS ═══════════ */
+
+// Progress Bar
+const ProgressBar = ({progress, label}) => (
+  <div style={{width:"100%"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+      <span style={{fontSize:13,fontWeight:600,color:T.blue}}>{label}</span>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <span style={{fontSize:12,color:T.gray400}}>{getEstimatedTime(progress)}</span>
+        <span style={{fontSize:14,fontWeight:800,color:T.gold}}>{Math.round(progress)}%</span>
+      </div>
+    </div>
+    <div style={{height:6,background:T.gray200,borderRadius:6,overflow:"hidden",position:"relative"}}>
+      <div style={{
+        height:"100%",
+        width:`${progress}%`,
+        background:`linear-gradient(90deg, ${T.blue}, ${T.gold})`,
+        borderRadius:6,
+        transition:"width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
+        position:"relative",
+        overflow:"hidden"
+      }}>
+        <div style={{
+          position:"absolute",inset:0,
+          background:"linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)",
+          backgroundSize:"200% 100%",
+          animation:"shimmer 2s infinite"
+        }}/>
+      </div>
+    </div>
+  </div>
+);
+
+// Choice Card
+const ChoiceCard = ({choice, onClick, selected}) => (
+  <button onClick={onClick} style={{
+    background:selected?T.blue:T.white,
+    border:`2px solid ${selected?T.blue:T.gray200}`,
+    borderRadius:14,
+    padding:"18px 20px",
+    cursor:"pointer",
+    textAlign:"left",
+    display:"flex",
+    alignItems:"center",
+    gap:16,
+    width:"100%",
+    transition:"all 0.2s cubic-bezier(0.4,0,0.2,1)",
+    transform:selected?"scale(1.01)":"scale(1)",
+    boxShadow:selected?`0 4px 20px rgba(26,61,77,0.2)`:T.shadow,
+  }}>
+    <span style={{fontSize:28,flexShrink:0,filter:selected?"brightness(0) invert(1)":"none",transition:"filter 0.2s"}}>{choice.icon}</span>
+    <div style={{flex:1}}>
+      <div style={{fontSize:15,fontWeight:700,color:selected?T.white:T.blue,lineHeight:1.3}}>{choice.label}</div>
+      {choice.sublabel && <div style={{fontSize:13,color:selected?"rgba(255,255,255,0.7)":T.gray400,marginTop:3}}>{choice.sublabel}</div>}
+    </div>
+    <div style={{
+      width:22,height:22,borderRadius:"50%",
+      border:`2px solid ${selected?T.white:"rgba(26,61,77,0.2)"}`,
+      background:selected?T.white:"transparent",
+      display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0
+    }}>
+      {selected && <div style={{width:10,height:10,borderRadius:"50%",background:T.blue}}/>}
+    </div>
+  </button>
+);
+
+// Yes/No Card
+const YesNoCard = ({label, sublabel, onClick, variant}) => {
+  const isYes = variant === "yes";
+  return (
+    <button onClick={onClick} style={{
+      background:T.white,
+      border:`2px solid ${isYes?T.orange:T.green}`,
+      borderRadius:14,
+      padding:"24px 28px",
+      cursor:"pointer",
+      textAlign:"center",
+      flex:1,
+      transition:"all 0.2s",
+      boxShadow:T.shadow,
+    }}>
+      <div style={{fontSize:36,marginBottom:10}}>{isYes?"⚠️":"✅"}</div>
+      <div style={{fontSize:16,fontWeight:700,color:isYes?T.orange:T.green}}>{label}</div>
+      <div style={{fontSize:13,color:T.gray500,marginTop:4}}>{sublabel}</div>
+    </button>
+  );
+};
+
+/* ═══════════ SCREENS ═══════════ */
+
+// LANDING PAGE
+const Landing = ({onStart}) => {
+  const [visible, setVisible] = useState(false);
+  useEffect(()=>{setTimeout(()=>setVisible(true),100)},[]);
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",background:T.white}}>
+      {/* Header */}
+      <header style={{padding:"20px 40px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.gray100}`}}>
+        <div style={{fontSize:18,fontWeight:900,letterSpacing:"0.08em"}}>
+          <span style={{color:T.blue}}>ATELIER</span><span style={{color:T.gold}}> GAMBETTA</span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:13,color:T.gray400}}>📞</span>
+          <span style={{fontSize:13,fontWeight:600,color:T.blue}}>01 48 40 44 22</span>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"60px 24px",textAlign:"center",opacity:visible?1:0,transform:visible?"translateY(0)":"translateY(30px)",transition:"all 0.8s cubic-bezier(0.4,0,0.2,1)"}}>
+
+        {/* Badge SEO */}
+        <div style={{display:"inline-flex",alignItems:"center",gap:8,background:T.orangeLight,border:`1px solid ${T.orange}33`,borderRadius:50,padding:"8px 20px",marginBottom:32}}>
+          <span style={{fontSize:14}}>⚡</span>
+          <span style={{fontSize:13,fontWeight:600,color:T.orange}}>Diagnostic gratuit en 2 minutes</span>
+        </div>
+
+        {/* H1 — SEO */}
+        <h1 style={{fontSize:"clamp(36px, 6vw, 64px)",fontWeight:900,color:T.blue,lineHeight:1.1,maxWidth:760,letterSpacing:"-0.02em",marginBottom:16}}>
+          Votre enseigne est<br/>
+          <span style={{color:T.gold,animation:"glow 3s ease-in-out infinite"}}>cassée ?</span>
+        </h1>
+
+        <p style={{fontSize:"clamp(16px, 2vw, 20px)",color:T.gray500,maxWidth:560,lineHeight:1.7,marginBottom:40}}>
+          Ne perdez pas de clients à cause d'une enseigne en panne.<br/>
+          Faites votre auto-diagnostic maintenant — nos experts vous rappellent <strong style={{color:T.blue}}>sous 24h</strong>.
+        </p>
+
+        {/* Stats */}
+        <div style={{display:"flex",gap:40,marginBottom:48,flexWrap:"wrap",justifyContent:"center"}}>
+          {[
+            {value:"50 ans", label:"d'expertise"},
+            {value:"1 000+", label:"enseignes / an"},
+            {value:"4.8/5 ⭐", label:"189 avis Google"},
+            {value:"24h", label:"délai de rappel"},
+          ].map((s,i)=>(
+            <div key={i} style={{textAlign:"center"}}>
+              <div style={{fontSize:22,fontWeight:800,color:T.blue}}>{s.value}</div>
+              <div style={{fontSize:13,color:T.gray400,marginTop:2}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <button onClick={onStart} style={{
+          background:`linear-gradient(135deg, ${T.gold}, ${T.goldBright})`,
+          color:T.white,
+          border:"none",
+          borderRadius:50,
+          padding:"18px 48px",
+          fontSize:17,
+          fontWeight:700,
+          cursor:"pointer",
+          boxShadow:`0 8px 32px rgba(212,149,42,0.4)`,
+          animation:"pulse 2s infinite",
+          letterSpacing:"0.01em",
+          transition:"transform 0.2s",
+          display:"flex",
+          alignItems:"center",
+          gap:12,
+        }}>
+          <span>🔍</span>
+          Diagnostiquer mon enseigne gratuitement
+          <span>→</span>
+        </button>
+
+        <p style={{fontSize:13,color:T.gray400,marginTop:16}}>
+          🔒 Gratuit · Sans engagement · Réponse sous 24h
+        </p>
+
+        {/* Trust signals */}
+        <div style={{display:"flex",gap:24,marginTop:48,flexWrap:"wrap",justifyContent:"center"}}>
+          {["N°1 des enseignes à Paris","Fabricant depuis 1975","Atelier à Romainville (93)","Île-de-France"].map((t,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:13,color:T.gray500}}>
+              <span style={{color:T.green}}>✓</span>{t}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom strip */}
+      <div style={{background:T.blue,padding:"16px 40px",display:"flex",justifyContent:"center",gap:40,flexWrap:"wrap"}}>
+        {["💡 Enseigne lumineuse","🏪 Store & Lambrequin","🪟 Vitrophanie","🪧 Signalétique"].map((t,i)=>(
+          <span key={i} style={{fontSize:13,color:"rgba(255,255,255,0.7)",fontWeight:500}}>{t}</span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// INFOS PERSONNELLES
+const InfosPerso = ({onNext, data, onChange}) => {
+  const [visible, setVisible] = useState(false);
+  useEffect(()=>{setTimeout(()=>setVisible(true),80)},[]);
+  const [localData, setLocalData] = useState(data || {prenom:"",nom:"",email:"",telephone:"",gambetta:null});
+  const update = (k,v) => { const d={...localData,[k]:v}; setLocalData(d); onChange(d); };
+  const valid = localData.prenom && localData.email && localData.telephone && localData.gambetta !== null;
+
+  return (
+    <div style={{animation:visible?"fadeSlideIn 0.5s ease forwards":"none",opacity:visible?1:0}}>
+      <h2 style={{fontSize:24,fontWeight:800,color:T.blue,marginBottom:8}}>Commençons par faire connaissance 👋</h2>
+      <p style={{fontSize:15,color:T.gray500,marginBottom:32}}>Ces informations permettront à nos experts de vous recontacter rapidement.</p>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+        <div>
+          <label style={{fontSize:13,fontWeight:600,color:T.blue,display:"block",marginBottom:6}}>Prénom *</label>
+          <input value={localData.prenom} onChange={e=>update("prenom",e.target.value)} placeholder="Marie" style={inputStyle} />
+        </div>
+        <div>
+          <label style={{fontSize:13,fontWeight:600,color:T.blue,display:"block",marginBottom:6}}>Nom</label>
+          <input value={localData.nom} onChange={e=>update("nom",e.target.value)} placeholder="Dupont" style={inputStyle} />
+        </div>
+      </div>
+
+      <div style={{marginBottom:16}}>
+        <label style={{fontSize:13,fontWeight:600,color:T.blue,display:"block",marginBottom:6}}>Email professionnel *</label>
+        <input type="email" value={localData.email} onChange={e=>update("email",e.target.value)} placeholder="marie@moncommerce.fr" style={inputStyle} />
+      </div>
+
+      <div style={{marginBottom:28}}>
+        <label style={{fontSize:13,fontWeight:600,color:T.blue,display:"block",marginBottom:6}}>Numéro de téléphone *</label>
+        <input type="tel" value={localData.telephone} onChange={e=>update("telephone",e.target.value)} placeholder="06 12 34 56 78" style={inputStyle} />
+      </div>
+
+      <div style={{marginBottom:32}}>
+        <label style={{fontSize:14,fontWeight:700,color:T.blue,display:"block",marginBottom:12}}>Votre enseigne a-t-elle été réalisée par l'Atelier Gambetta ? 🏷️</label>
+        <div style={{display:"flex",gap:12}}>
+          {[{v:true,l:"✅ Oui, c'est Gambetta",s:"Client existant"},{v:false,l:"🔄 Non, autre fabricant",s:"Nouveau client"}].map(({v,l,s})=>(
+            <button key={String(v)} onClick={()=>update("gambetta",v)} style={{
+              flex:1,padding:"16px 20px",borderRadius:12,border:`2px solid ${localData.gambetta===v?T.blue:T.gray200}`,
+              background:localData.gambetta===v?T.blueVeryLight:T.white,cursor:"pointer",textAlign:"center",transition:"all 0.2s"
+            }}>
+              <div style={{fontSize:14,fontWeight:700,color:localData.gambetta===v?T.blue:T.gray600}}>{l}</div>
+              <div style={{fontSize:12,color:T.gray400,marginTop:3}}>{s}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button disabled={!valid} onClick={()=>valid&&onNext(localData)} style={{
+        background:valid?`linear-gradient(135deg, ${T.blue}, ${T.blueLight})`:T.gray300,
+        color:T.white,border:"none",borderRadius:50,padding:"16px 40px",fontSize:15,fontWeight:700,
+        cursor:valid?"pointer":"not-allowed",width:"100%",transition:"all 0.3s",
+        boxShadow:valid?`0 4px 20px rgba(26,61,77,0.3)`:"none",
+      }}>
+        Commencer le diagnostic →
+      </button>
+
+      <p style={{fontSize:12,color:T.gray400,textAlign:"center",marginTop:12}}>
+        🔒 Vos données sont confidentielles et utilisées uniquement pour votre diagnostic
+      </p>
+    </div>
+  );
+};
+
+const inputStyle = {
+  width:"100%",padding:"14px 16px",borderRadius:10,border:`2px solid #E2E6EA`,
+  fontSize:15,color:"#1A3D4D",outline:"none",transition:"border-color 0.2s",
+  background:"#FAFBFC",
+};
+
+// QUESTION STEP
+const QuestionStep = ({stepKey, onAnswer, onBack, history}) => {
+  const [selected, setSelected] = useState(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(()=>{setVisible(false);setTimeout(()=>setVisible(true),80)},[stepKey]);
+  const step = TREE[stepKey];
+  if(!step) return null;
+
+  const handleChoice = (choice) => {
+    setSelected(choice.id);
+    setTimeout(()=>onAnswer(choice), 300);
+  };
+
+  return (
+    <div style={{opacity:visible?1:0,transform:visible?"translateY(0)":"translateY(16px)",transition:"all 0.4s ease"}}>
+      {step.type==="choice" && (
+        <>
+          <h2 style={{fontSize:22,fontWeight:800,color:T.blue,marginBottom:8,lineHeight:1.3}}>{step.question}</h2>
+          {step.subtitle && <p style={{fontSize:15,color:T.gray500,marginBottom:24}}>{step.subtitle}</p>}
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {step.choices.map(choice=>(
+              <ChoiceCard key={choice.id} choice={choice} selected={selected===choice.id} onClick={()=>handleChoice(choice)} />
+            ))}
+          </div>
+        </>
+      )}
+      {step.type==="yesno" && (
+        <>
+          <div style={{textAlign:"center",marginBottom:8}}>
+            <span style={{fontSize:48,display:"block",marginBottom:16,animation:"float 3s ease-in-out infinite"}}>🛡️</span>
+            <h2 style={{fontSize:22,fontWeight:800,color:T.blue,marginBottom:8}}>{step.question}</h2>
+            {step.subtitle && <p style={{fontSize:15,color:T.gray500,marginBottom:28}}>{step.subtitle}</p>}
+          </div>
+          <div style={{display:"flex",gap:16}}>
+            <YesNoCard variant="yes" label={step.yes.label} sublabel={step.yes.sublabel} onClick={()=>onAnswer({...step.yes,id:"yes",urgent:true})} />
+            <YesNoCard variant="no" label={step.no.label} sublabel={step.no.sublabel} onClick={()=>onAnswer({...step.no,id:"no"})} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// UPLOAD STEP
+const UploadStep = ({onSubmit, isUrgent}) => {
+  const [visible, setVisible] = useState(false);
+  const [files, setFiles] = useState([]);
+  const [description, setDescription] = useState("");
+  const [dragging, setDragging] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const inputRef = useRef();
+  useEffect(()=>{setTimeout(()=>setVisible(true),80)},[]);
+
+  const addFiles = (newFiles) => {
+    const arr = Array.from(newFiles).map(f=>({file:f,name:f.name,size:f.size,preview:f.type.startsWith("image/")?URL.createObjectURL(f):null}));
+    setFiles(prev=>[...prev,...arr]);
+  };
+
+  return (
+    <div style={{opacity:visible?1:0,transform:visible?"translateY(0)":"translateY(16px)",transition:"all 0.4s ease"}}>
+      {isUrgent && (
+        <div style={{background:T.orangeLight,border:`2px solid ${T.orange}`,borderRadius:12,padding:"16px 20px",marginBottom:24,display:"flex",gap:14,alignItems:"center"}}>
+          <span style={{fontSize:28}}>🚨</span>
+          <div>
+            <div style={{fontSize:14,fontWeight:700,color:T.orange}}>Situation urgente détectée</div>
+            <div style={{fontSize:13,color:T.gray600}}>Un technicien vous contactera en priorité dans les plus brefs délais.</div>
+          </div>
+        </div>
+      )}
+
+      <h2 style={{fontSize:22,fontWeight:800,color:T.blue,marginBottom:8}}>Montrez-nous le problème 📸</h2>
+      <p style={{fontSize:15,color:T.gray500,marginBottom:24}}>Une photo ou vidéo permet à nos experts d'évaluer précisément votre situation avant d'intervenir. <span style={{color:T.gray400}}>(optionnel)</span></p>
+
+      {/* Drop zone */}
+      <div
+        onDragOver={e=>{e.preventDefault();setDragging(true)}}
+        onDragLeave={()=>setDragging(false)}
+        onDrop={e=>{e.preventDefault();setDragging(false);addFiles(e.dataTransfer.files)}}
+        onClick={()=>inputRef.current?.click()}
+        style={{
+          border:`2px dashed ${dragging?T.gold:T.gray300}`,
+          borderRadius:14,padding:"36px 24px",textAlign:"center",
+          background:dragging?T.goldLight:T.bluePale,cursor:"pointer",
+          transition:"all 0.3s",marginBottom:16,
+        }}
+      >
+        <span style={{fontSize:36,display:"block",marginBottom:10}}>📁</span>
+        <div style={{fontSize:15,fontWeight:600,color:T.blue,marginBottom:4}}>Glisser-déposer ici</div>
+        <div style={{fontSize:13,color:T.gray400}}>ou <span style={{color:T.gold,fontWeight:600}}>cliquez pour choisir</span> — Photos, vidéos acceptées</div>
+        <input ref={inputRef} type="file" multiple accept="image/*,video/*" style={{display:"none"}} onChange={e=>addFiles(e.target.files)} />
+      </div>
+
+      {/* File previews */}
+      {files.length>0 && (
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:16}}>
+          {files.map((f,i)=>(
+            <div key={i} style={{position:"relative",width:80,height:80,borderRadius:10,overflow:"hidden",border:`2px solid ${T.gray200}`}}>
+              {f.preview ? <img src={f.preview} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} /> :
+                <div style={{width:"100%",height:"100%",background:T.blueVeryLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>🎬</div>}
+              <button onClick={()=>setFiles(prev=>prev.filter((_,j)=>j!==i))} style={{position:"absolute",top:4,right:4,width:20,height:20,borderRadius:"50%",background:"rgba(0,0,0,0.6)",color:"white",border:"none",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Description */}
+      <div style={{marginBottom:28}}>
+        <label style={{fontSize:13,fontWeight:600,color:T.blue,display:"block",marginBottom:6}}>
+          Décrivez le problème en détail <span style={{color:T.gray400,fontWeight:400}}>(optionnel)</span>
+        </label>
+        <textarea
+          value={description}
+          onChange={e=>setDescription(e.target.value)}
+          placeholder="Ex: La lettre 'A' clignote depuis 3 jours, surtout le soir quand il fait froid. Les autres lettres fonctionnent bien…"
+          rows={4}
+          style={{...inputStyle,resize:"vertical",lineHeight:1.6}}
+        />
+        <div style={{fontSize:12,color:T.gray400,marginTop:4}}>💡 Plus vous êtes précis, plus notre estimation sera juste</div>
+      </div>
+
+      {/* Submit */}
+      <button onClick={()=>{setSubmitted(true);onSubmit({files,description})}} style={{
+        background:`linear-gradient(135deg, ${T.gold}, ${T.goldBright})`,
+        color:T.white,border:"none",borderRadius:50,padding:"18px 40px",
+        fontSize:16,fontWeight:700,cursor:"pointer",width:"100%",
+        boxShadow:`0 6px 24px rgba(212,149,42,0.4)`,transition:"transform 0.2s",
+        display:"flex",alignItems:"center",justifyContent:"center",gap:12,
+      }}>
+        <span>📤</span> Envoyer mon diagnostic
+      </button>
+      <p style={{fontSize:12,color:T.gray400,textAlign:"center",marginTop:12}}>
+        Nos experts analysent votre diagnostic et vous recontactent sous 24h
+      </p>
+    </div>
+  );
+};
+
+// CONFIRMATION
+const Confirmation = ({data, infos, isUrgent}) => {
+  const [visible, setVisible] = useState(false);
+  useEffect(()=>{setTimeout(()=>setVisible(true),100)},[]);
+  return (
+    <div style={{textAlign:"center",padding:"20px 0",opacity:visible?1:0,transform:visible?"translateY(0)":"translateY(20px)",transition:"all 0.6s ease"}}>
+      {/* Checkmark animation */}
+      <div style={{width:80,height:80,borderRadius:"50%",background:T.greenLight,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 24px",fontSize:40}}>
+        ✅
+      </div>
+      <h2 style={{fontSize:28,fontWeight:900,color:T.blue,marginBottom:8}}>Diagnostic envoyé ! 🎉</h2>
+      <p style={{fontSize:16,color:T.gray500,maxWidth:440,margin:"0 auto",lineHeight:1.7,marginBottom:32}}>
+        Merci <strong style={{color:T.blue}}>{infos?.prenom || "pour votre confiance"}</strong>. Votre diagnostic a bien été reçu. Nos experts vont l'analyser et vous recontacter {isUrgent?"<strong>en priorité dans les plus brefs délais</strong>":""} sous <strong style={{color:T.gold}}>24h</strong>.
+      </p>
+
+      {/* Summary card */}
+      <div style={{background:T.bluePale,borderRadius:14,padding:24,marginBottom:32,textAlign:"left",border:`1px solid ${T.gray200}`}}>
+        <div style={{fontSize:13,fontWeight:700,color:T.blue,marginBottom:14,letterSpacing:"0.05em"}}>RÉCAPITULATIF DE VOTRE DIAGNOSTIC</div>
+        {data.map((item,i)=>(
+          <div key={i} style={{display:"flex",gap:12,padding:"8px 0",borderBottom:i<data.length-1?`1px solid ${T.gray200}`:"none"}}>
+            <span style={{fontSize:16}}>{item.icon||"▸"}</span>
+            <div>
+              <div style={{fontSize:12,color:T.gray400}}>{item.question}</div>
+              <div style={{fontSize:14,fontWeight:600,color:T.blue}}>{item.answer}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {isUrgent && (
+        <div style={{background:T.orangeLight,border:`2px solid ${T.orange}`,borderRadius:12,padding:"16px 24px",marginBottom:24,display:"flex",gap:14,alignItems:"center"}}>
+          <span style={{fontSize:24}}>🚨</span>
+          <div style={{textAlign:"left"}}>
+            <div style={{fontSize:14,fontWeight:700,color:T.orange}}>Situation urgente — Nous vous rappelons en priorité</div>
+            <div style={{fontSize:13,color:T.gray600,marginTop:2}}>Si besoin, appelez-nous directement : <strong style={{color:T.blue}}>01 48 40 44 22</strong></div>
+          </div>
+        </div>
+      )}
+
+      <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
+        <a href="https://www.ateliergambetta.com" style={{
+          display:"inline-flex",alignItems:"center",gap:8,
+          background:T.blue,color:T.white,borderRadius:50,padding:"14px 28px",
+          fontSize:14,fontWeight:600,textDecoration:"none",
+        }}>
+          🏠 Retour au site
+        </a>
+        <a href="tel:0148404422" style={{
+          display:"inline-flex",alignItems:"center",gap:8,
+          background:T.white,color:T.blue,border:`2px solid ${T.blue}`,borderRadius:50,padding:"14px 28px",
+          fontSize:14,fontWeight:600,textDecoration:"none",
+        }}>
+          📞 Appeler l'atelier
+        </a>
+      </div>
+
+      <p style={{fontSize:13,color:T.gray400,marginTop:24}}>
+        Un email de confirmation a été envoyé à <strong>{infos?.email}</strong>
+      </p>
+    </div>
+  );
+};
+
+/* ═══════════ MAIN APP ═══════════ */
+function App() {
+  const [screen, setScreen] = useState("landing"); // landing | infos | diagnostic | upload | confirm
+  const [infos, setInfos] = useState({});
+  const [history, setHistory] = useState([]); // [{stepKey, answer}]
+  const [currentStep, setCurrentStep] = useState("type");
+  const [diagnosticSummary, setDiagnosticSummary] = useState([]);
+  const [isUrgent, setIsUrgent] = useState(false);
+  const [uploadData, setUploadData] = useState(null);
+
+  // Progress calculation
+  const getProgress = () => {
+    if(screen==="landing") return 0;
+    if(screen==="infos") return 8;
+    if(screen==="confirm") return 100;
+    if(screen==="upload") return 85;
+    const base = 15;
+    const perStep = 70 / TOTAL_STEPS_ESTIMATE;
+    return Math.min(80, base + history.length * perStep);
+  };
+
+  const progress = getProgress();
+
+  // Handle diagnostic answer
+  const handleAnswer = (choice) => {
+    const step = TREE[currentStep];
+    if(!step) return;
+
+    // Build summary entry
+    const entry = {
+      question: step.question,
+      answer: choice.label || (choice.id==="yes"?step.yes?.label:step.no?.label),
+      icon: choice.icon
+    };
+
+    setDiagnosticSummary(prev=>[...prev, entry]);
+    setHistory(prev=>[...prev, {stepKey:currentStep, choiceId:choice.id}]);
+
+    if(choice.urgent) setIsUrgent(true);
+
+    const nextKey = choice.next;
+    if(!nextKey || nextKey==="upload") {
+      setScreen("upload");
+    } else {
+      setCurrentStep(nextKey);
+    }
+  };
+
+  const handleBack = () => {
+    if(screen==="upload") {
+      if(history.length>0) {
+        const lastStep = history[history.length-1].stepKey;
+        setHistory(prev=>prev.slice(0,-1));
+        setDiagnosticSummary(prev=>prev.slice(0,-1));
+        setCurrentStep(lastStep);
+        setScreen("diagnostic");
+      } else {
+        setScreen("infos");
+      }
+    } else if(screen==="diagnostic") {
+      if(history.length===0) {
+        setScreen("infos");
+      } else {
+        const prev = history[history.length-1].stepKey;
+        setHistory(h=>h.slice(0,-1));
+        setDiagnosticSummary(s=>s.slice(0,-1));
+        setCurrentStep(prev);
+      }
+    } else if(screen==="infos") {
+      setScreen("landing");
+    }
+  };
+
+  const handleSubmit = (data) => {
+    setUploadData(data);
+    setScreen("confirm");
+  };
+
+  // LANDING
+  if(screen==="landing") return <Landing onStart={()=>setScreen("infos")} />;
+
+  return (
+    <div style={{minHeight:"100vh",background:T.bluePale,display:"flex",flexDirection:"column"}}>
+      {/* Global Header */}
+      <header style={{background:T.white,borderBottom:`1px solid ${T.gray100}`,padding:"0 24px",height:64,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}}>
+        <div style={{fontSize:16,fontWeight:900,letterSpacing:"0.08em"}}>
+          <span style={{color:T.blue}}>ATELIER</span><span style={{color:T.gold}}> GAMBETTA</span>
+        </div>
+        {screen!=="confirm" && (
+          <div style={{flex:1,maxWidth:500,margin:"0 32px"}}>
+            <ProgressBar progress={progress} label={screen==="infos"?"Vos informations":screen==="upload"?"Presque terminé !":"Votre diagnostic"} />
+          </div>
+        )}
+        <a href="tel:0148404422" style={{display:"flex",alignItems:"center",gap:8,textDecoration:"none",color:T.blue,fontSize:13,fontWeight:600}}>
+          <span>📞</span><span style={{display:window.innerWidth>600?"block":"none"}}>01 48 40 44 22</span>
+        </a>
+      </header>
+
+      {/* Content */}
+      <div style={{flex:1,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"40px 24px"}}>
+        <div style={{width:"100%",maxWidth:620,background:T.white,borderRadius:20,boxShadow:`0 4px 40px rgba(26,61,77,0.1)`,padding:"40px 48px"}}>
+
+          {/* Back button */}
+          {screen!=="confirm" && (
+            <button onClick={handleBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",fontSize:13,color:T.gray400,fontWeight:600,marginBottom:28,padding:0,transition:"color 0.2s"}}>
+              ← Retour
+            </button>
+          )}
+
+          {/* Step indicator for diagnostic */}
+          {screen==="diagnostic" && (
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:24}}>
+              <div style={{height:3,flex:1,background:T.gray200,borderRadius:3,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${progress}%`,background:T.gold,borderRadius:3,transition:"width 0.5s ease"}} />
+              </div>
+            </div>
+          )}
+
+          {/* Screens */}
+          {screen==="infos" && <InfosPerso data={infos} onChange={setInfos} onNext={(d)=>{setInfos(d);setScreen("diagnostic")}} />}
+          {screen==="diagnostic" && <QuestionStep stepKey={currentStep} onAnswer={handleAnswer} onBack={handleBack} history={history} />}
+          {screen==="upload" && <UploadStep isUrgent={isUrgent} onSubmit={handleSubmit} />}
+          {screen==="confirm" && <Confirmation data={diagnosticSummary} infos={infos} isUrgent={isUrgent} />}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer style={{padding:"16px 32px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+        <span style={{fontSize:12,color:T.gray400}}>© Atelier Gambetta — Fabricant d'enseignes depuis 1975</span>
+        <span style={{fontSize:12,color:T.gray400}}>Propulsé par <strong style={{color:T.blue}}>Kyne Agency</strong></span>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
