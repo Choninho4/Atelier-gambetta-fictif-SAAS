@@ -58,45 +58,42 @@ const TREE = {
 
   // ── ENSEIGNE LUMINEUSE ──
   lumineux_symptome: {
-    id:"lumineux_symptome", question:"Quel est le symptôme principal ?", subtitle:"Décrivez le problème que vous observez", type:"choice",
+    id:"lumineux_symptome", question:"Quel est votre problème ?", subtitle:"Décrivez ce que vous observez sur votre enseigne", type:"choice",
     choices:[
-      {id:"eteint", label:"Elle est complètement éteinte", sublabel:"Aucune lumière visible", icon:"⚫", next:"lumineux_etendue"},
+      {id:"eteint", label:"Elle est complètement / en partie éteinte", sublabel:"Une ou plusieurs zones sans lumière", icon:"⚫", next:"lumineux_etendue"},
       {id:"clignote", label:"Elle clignote ou vacille", sublabel:"Lumière instable, flashs", icon:"⚡", next:"lumineux_cligno"},
       {id:"faible", label:"La lumière est plus faible", sublabel:"Moins lumineuse qu'avant", icon:"🔅", next:"lumineux_zone"},
-      {id:"choc", label:"Suite à un choc ou intempérie", sublabel:"Chute, impact, tempête", icon:"💥", next:"lumineux_zone"},
     ]
   },
   lumineux_etendue: {
     id:"lumineux_etendue", question:"Quelle partie ne s'allume plus ?", subtitle:"Soyez le plus précis possible", type:"choice",
     choices:[
-      {id:"tout", label:"Toute l'enseigne", sublabel:"Rien ne s'allume du tout", icon:"🔲", next:"lumineux_duree"},
-      {id:"plusieurs", label:"Plusieurs lettres", sublabel:"Une partie de l'enseigne", icon:"🔡", next:"lumineux_duree"},
-      {id:"une", label:"Une seule lettre", sublabel:"Uniquement un caractère", icon:"🔤", next:"lumineux_duree"},
-      {id:"segment", label:"Une partie d'une lettre", sublabel:"Un segment, un côté", icon:"▪️", next:"lumineux_duree"},
+      {id:"tout", label:"Toute l'enseigne", sublabel:"Rien ne s'allume du tout", icon:"🔲", next:"upload"},
+      {id:"plusieurs", label:"Plusieurs lettres", sublabel:"Une partie de l'enseigne", icon:"🔡", next:"lumineux_repartition"},
+      {id:"une", label:"Une seule lettre", sublabel:"Uniquement un caractère", icon:"🔤", next:"upload"},
+      {id:"segment", label:"Une partie d'une lettre", sublabel:"Un segment, un côté", icon:"▪️", next:"upload"},
+    ]
+  },
+  lumineux_repartition: {
+    id:"lumineux_repartition", question:"Comment sont réparties les lettres éteintes ?", subtitle:"Cela nous aide à identifier l'origine de la panne", type:"choice",
+    choices:[
+      {id:"groupees", label:"Elles sont groupées", sublabel:"Les lettres éteintes sont côte à côte", icon:"🟦", next:"upload"},
+      {id:"eparpillees", label:"Elles sont éparpillées", sublabel:"Les lettres éteintes sont dispersées", icon:"🔵", next:"upload"},
     ]
   },
   lumineux_cligno: {
     id:"lumineux_cligno", question:"Le clignotement est…", subtitle:"", type:"choice",
     choices:[
-      {id:"permanent", label:"Permanent en continu", sublabel:"Depuis le début, ça ne s'arrête pas", icon:"🔁", next:"lumineux_duree"},
-      {id:"intermittent", label:"Par intermittence", sublabel:"Parfois ça marche, parfois non", icon:"🔀", next:"lumineux_duree"},
-      {id:"demarrage", label:"Au démarrage uniquement", sublabel:"Ça clignote puis ça s'arrête", icon:"▶️", next:"lumineux_duree"},
+      {id:"permanent", label:"Permanent en continu", sublabel:"Depuis le début, ça ne s'arrête pas", icon:"🔁", next:"upload"},
+      {id:"intermittent", label:"Par intermittence", sublabel:"Parfois ça marche, parfois non", icon:"🔀", next:"upload"},
+      {id:"demarrage", label:"Au démarrage uniquement", sublabel:"Ça clignote puis ça s'arrête", icon:"▶️", next:"upload"},
     ]
   },
   lumineux_zone: {
     id:"lumineux_zone", question:"C'est sur quelle zone ?", subtitle:"", type:"choice",
     choices:[
-      {id:"tout", label:"Toute l'enseigne", sublabel:"Problème généralisé", icon:"🔲", next:"lumineux_duree"},
-      {id:"partielle", label:"Une zone précise", sublabel:"Localisé sur une partie", icon:"📍", next:"lumineux_duree"},
-    ]
-  },
-  lumineux_duree: {
-    id:"lumineux_duree", question:"Depuis combien de temps ?", subtitle:"Cela nous aide à évaluer l'urgence d'intervention", type:"choice",
-    choices:[
-      {id:"24h", label:"Moins de 24h", sublabel:"C'est tout récent", icon:"⏰", next:"securite", urgent:true},
-      {id:"jours", label:"Quelques jours", sublabel:"2 à 7 jours", icon:"📅", next:"securite"},
-      {id:"semaines", label:"Quelques semaines", sublabel:"Plus d'une semaine", icon:"🗓️", next:"securite"},
-      {id:"mois", label:"Plus d'un mois", sublabel:"Problème ancien", icon:"📆", next:"securite"},
+      {id:"tout", label:"Toute l'enseigne", sublabel:"Problème généralisé", icon:"🔲", next:"upload"},
+      {id:"partielle", label:"Une zone précise", sublabel:"Localisé sur une partie", icon:"📍", next:"upload"},
     ]
   },
 
@@ -107,32 +104,23 @@ const TREE = {
       {id:"souvre_pas", label:"Il ne s'ouvre plus", sublabel:"Bloqué en position fermée", icon:"🚫", next:"store_mecanisme"},
       {id:"ferme_pas", label:"Il ne se ferme plus", sublabel:"Bloqué en position ouverte", icon:"↔️", next:"store_mecanisme"},
       {id:"toile", label:"La toile est abîmée", sublabel:"Déchirée, tachée, délavée", icon:"🪡", next:"store_toile"},
-      {id:"bruit", label:"Bruit anormal", sublabel:"Grincements, craquements", icon:"🔊", next:"store_duree"},
-      {id:"armature", label:"Armature / structure abîmée", sublabel:"Tordue, cassée, pliée", icon:"🔧", next:"store_duree"},
+      {id:"bruit", label:"Bruit anormal", sublabel:"Grincements, craquements", icon:"🔊", next:"upload"},
+      {id:"armature", label:"Armature / structure abîmée", sublabel:"Tordue, cassée, pliée", icon:"🔧", next:"upload"},
     ]
   },
   store_mecanisme: {
     id:"store_mecanisme", question:"Le mécanisme est…", subtitle:"", type:"choice",
     choices:[
-      {id:"manivelle", label:"Manuel (à manivelle)", sublabel:"Système mécanique sans moteur", icon:"🔄", next:"store_duree"},
-      {id:"motorise", label:"Motorisé / électrique", sublabel:"Avec télécommande ou interrupteur", icon:"📡", next:"store_duree"},
+      {id:"manivelle", label:"Manuel (à manivelle)", sublabel:"Système mécanique sans moteur", icon:"🔄", next:"upload"},
+      {id:"motorise", label:"Motorisé / électrique", sublabel:"Avec télécommande ou interrupteur", icon:"📡", next:"upload"},
     ]
   },
   store_toile: {
     id:"store_toile", question:"L'état de la toile ?", subtitle:"", type:"choice",
     choices:[
-      {id:"dechirure", label:"Déchirure / trou", sublabel:"Tissu percé ou arraché", icon:"✂️", next:"store_duree"},
-      {id:"tache", label:"Taches importantes", sublabel:"Moisissures, traces indélébiles", icon:"💧", next:"store_duree"},
-      {id:"delave", label:"Couleurs délavées", sublabel:"Fané par le soleil", icon:"☀️", next:"store_duree"},
-    ]
-  },
-  store_duree: {
-    id:"store_duree", question:"Depuis combien de temps ?", subtitle:"", type:"choice",
-    choices:[
-      {id:"24h", label:"Moins de 24h", icon:"⏰", next:"securite", urgent:true},
-      {id:"jours", label:"Quelques jours", icon:"📅", next:"securite"},
-      {id:"semaines", label:"Quelques semaines", icon:"🗓️", next:"securite"},
-      {id:"mois", label:"Plus d'un mois", icon:"📆", next:"securite"},
+      {id:"dechirure", label:"Déchirure / trou", sublabel:"Tissu percé ou arraché", icon:"✂️", next:"upload"},
+      {id:"tache", label:"Taches importantes", sublabel:"Moisissures, traces indélébiles", icon:"💧", next:"upload"},
+      {id:"delave", label:"Couleurs délavées", sublabel:"Fané par le soleil", icon:"☀️", next:"upload"},
     ]
   },
 
@@ -149,9 +137,9 @@ const TREE = {
   vitrophanie_zone: {
     id:"vitrophanie_zone", question:"Sur combien de vitres ?", subtitle:"", type:"choice",
     choices:[
-      {id:"une", label:"Une seule vitre", icon:"🪟", next:"securite"},
-      {id:"plusieurs", label:"Plusieurs vitres", icon:"🏬", next:"securite"},
-      {id:"devanture", label:"Toute la devanture", icon:"🏪", next:"securite"},
+      {id:"une", label:"Une seule vitre", icon:"🪟", next:"upload"},
+      {id:"plusieurs", label:"Plusieurs vitres", icon:"🏬", next:"upload"},
+      {id:"devanture", label:"Toute la devanture", icon:"🏪", next:"upload"},
     ]
   },
 
@@ -159,19 +147,13 @@ const TREE = {
   signaletique_symptome: {
     id:"signaletique_symptome", question:"Quel est le problème avec votre signalétique ?", subtitle:"", type:"choice",
     choices:[
-      {id:"casse", label:"Support cassé / fissuré", sublabel:"Panneau, totem, plaque", icon:"💔", next:"securite"},
-      {id:"efface", label:"Texte ou impression effacé", sublabel:"Illisible, délavé", icon:"🔍", next:"securite"},
-      {id:"fixation", label:"Fixation défaillante", sublabel:"Risque de chute", icon:"⚠️", next:"securite", urgent:true},
-      {id:"maj", label:"Mise à jour du contenu", sublabel:"Nouvelles infos à afficher", icon:"✏️", next:"securite"},
+      {id:"casse", label:"Support cassé / fissuré", sublabel:"Panneau, totem, plaque", icon:"💔", next:"upload"},
+      {id:"efface", label:"Texte ou impression effacé", sublabel:"Illisible, délavé", icon:"🔍", next:"upload"},
+      {id:"fixation", label:"Fixation défaillante", sublabel:"Risque de chute", icon:"⚠️", next:"upload", urgent:true},
+      {id:"maj", label:"Mise à jour du contenu", sublabel:"Nouvelles infos à afficher", icon:"✏️", next:"upload"},
     ]
   },
 
-  // ── SÉCURITÉ ──
-  securite: {
-    id:"securite", question:"Y a-t-il un risque de sécurité immédiat ?", subtitle:"Câbles apparents, risque de chute, danger électrique…", type:"yesno",
-    yes:{label:"Oui, c'est urgent", sublabel:"Risque pour les personnes", next:"upload", urgent:true},
-    no:{label:"Non, pas de danger", sublabel:"Pas de risque immédiat", next:"upload"},
-  },
 
   // ── UPLOAD & FIN ──
   upload: {id:"upload", type:"upload"},
@@ -652,7 +634,7 @@ function App() {
   const [screen, setScreen] = useState("landing"); // landing | infos | diagnostic | upload | confirm
   const [infos, setInfos] = useState({});
   const [history, setHistory] = useState([]); // [{stepKey, answer}]
-  const [currentStep, setCurrentStep] = useState("type");
+  const [currentStep, setCurrentStep] = useState("lumineux_symptome");
   const [diagnosticSummary, setDiagnosticSummary] = useState([]);
   const [isUrgent, setIsUrgent] = useState(false);
   const [uploadData, setUploadData] = useState(null);
