@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnostic Enseigne Cassée — Atelier Gambetta</title>
+<meta name="description" content="Votre enseigne est cassée ou ne s'allume plus ? Faites votre auto-diagnostic en 2 minutes. Atelier Gambetta, expert en réparation d'enseignes à Paris depuis 1975.">
+<meta name="keywords" content="enseigne cassée, enseigne qui ne s'allume plus, réparation enseigne, enseigne lumineuse cassée, néon cassé, réparation enseigne Paris">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23224761'/><text x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%23E8B130' font-size='14' font-weight='bold' font-family='sans-serif'>AG</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Readex Pro',sans-serif;background:#F4F4F4;color:#222221;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes checkIn{from{transform:scale(0.4);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes ticketIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+input,select,textarea{font-family:'Readex Pro',sans-serif}
+@media(max-width:600px){.hide-mobile{display:none!important}.client-cards{flex-direction:column!important}.grid-2{grid-template-columns:1fr!important}.stats-row{gap:16px!important}.stat-divider{display:none!important}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script type="text/babel">
+const {useState,useEffect,useRef} = React;
+
+/* ══ DESIGN TOKENS ══ */
+const T = {
+  blue:"#224761", blueDark:"#1A3550", blueMid:"#2E5F82", blueLight:"#EAF1F6",
+  amber:"#E8B130", amberHover:"#F5C84A",
+  bg:"#F4F4F4", black:"#222221",
+  red:"#C83E3F", redLight:"#FEF2F2",
+  white:"#FFFFFF", green:"#22A06B", greenLight:"#ECFDF5",
+  border:"#E2E6EA", gray3:"#D1D5DB", gray4:"#9CA3AF", gray5:"#6B7280", gray6:"#4B5563",
+  shadow:"0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)",
+  shadowMd:"0 4px 16px rgba(34,71,97,0.10)",
+  shadowLg:"0 8px 32px rgba(34,71,97,0.12)",
+};
+
+/* ══ PRICE RANGES ══ */
+const PRICE_RANGES = {
+  lumineux_etendue:{
+    tout:{min:150,max:400,label:"Toute l'enseigne éteinte"},
+    une:{min:60,max:150,label:"Une seule lettre éteinte"},
+    segment:{min:40,max:100,label:"Partie d'une lettre"},
+  },
+  lumineux_repartition:{
+    groupees:{min:80,max:200,label:"Plusieurs lettres groupées"},
+    eparpillees:{min:120,max:300,label:"Plusieurs lettres éparpillées"},
+  },
+  lumineux_cligno:{
+    permanent:{min:90,max:220,label:"Clignotement continu"},
+    intermittent:{min:70,max:180,label:"Clignotement intermittent"},
+    demarrage:{min:60,max:150,label:"Clignotement au démarrage"},
+  },
+  lumineux_zone:{
+    tout:{min:100,max:250,label:"Lumière faible — zone entière"},
+    partielle:{min:70,max:180,label:"Lumière faible — zone précise"},
+  },
+};
+const getPriceRange = (history) => {
+  for(const {stepKey,choiceId} of [...history].reverse()){
+    const sr = PRICE_RANGES[stepKey];
+    if(sr && sr[choiceId]) return sr[choiceId];
+  }
+  return null;
+};
+
+/* ══ DECISION TREE ══ */
+const TREE = {
+  lumineux_symptome:{id:"lumineux_symptome",question:"Quel est votre problème ?",subtitle:"Décrivez ce que vous observez sur votre enseigne",type:"choice",choices:[
+    {id:"eteint",label:"Elle est complètement / en partie éteinte",sublabel:"Une ou plusieurs zones sans lumière",icon:"off",next:"lumineux_etendue"},
+    {id:"clignote",label:"Elle clignote ou vacille",sublabel:"Lumière instable, flashs",icon:"zap",next:"lumineux_cligno"},
+    {id:"faible",label:"La lumière est plus faible",sublabel:"Moins lumineuse qu'avant",icon:"sun-dim",next:"lumineux_zone"},
+  ]},
+  lumineux_etendue:{id:"lumineux_etendue",question:"Quelle partie ne s'allume plus ?",subtitle:"Soyez le plus précis possible",type:"choice",choices:[
+    {id:"tout",label:"Toute l'enseigne",sublabel:"Rien ne s'allume du tout",icon:"layout",next:"upload"},
+    {id:"plusieurs",label:"Plusieurs lettres",sublabel:"Une partie de l'enseigne",icon:"type",next:"lumineux_repartition"},
+    {id:"une",label:"Une seule lettre",sublabel:"Uniquement un caractère",icon:"letter",next:"upload"},
+    {id:"segment",label:"Une partie d'une lettre",sublabel:"Un segment, un côté",icon:"minus-square",next:"upload"},
+  ]},
+  lumineux_repartition:{id:"lumineux_repartition",question:"Comment sont réparties les lettres éteintes ?",subtitle:"Cela aide à identifier l'origine de la panne",type:"choice",choices:[
+    {id:"groupees",label:"Elles sont groupées",sublabel:"Les lettres éteintes sont côte à côte",icon:"columns",next:"upload"},
+    {id:"eparpillees",label:"Elles sont éparpillées",sublabel:"Les lettres éteintes sont dispersées",icon:"grid",next:"upload"},
+  ]},
+  lumineux_cligno:{id:"lumineux_cligno",question:"Le clignotement est…",subtitle:"",type:"choice",choices:[
+    {id:"permanent",label:"Permanent en continu",sublabel:"Depuis le début, ça ne s'arrête pas",icon:"repeat",next:"upload"},
+    {id:"intermittent",label:"Par intermittence",sublabel:"Parfois ça marche, parfois non",icon:"shuffle",next:"upload"},
+    {id:"demarrage",label:"Au démarrage uniquement",sublabel:"Ça clignote puis ça s'arrête",icon:"play",next:"upload"},
+  ]},
+  lumineux_zone:{id:"lumineux_zone",question:"C'est sur quelle zone ?",subtitle:"",type:"choice",choices:[
+    {id:"tout",label:"Toute l'enseigne",sublabel:"Problème généralisé",icon:"layout",next:"upload"},
+    {id:"partielle",label:"Une zone précise",sublabel:"Localisé sur une partie",icon:"map-pin",next:"upload"},
+  ]},
+  upload:{id:"upload",type:"upload"},
+};
+const TOTAL_STEPS = 5;
+
+/* ══ ICON SYSTEM — Lucide-style SVG, stroke-width 1.5 ══ */
+const IC = {
+  phone:   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.36 14a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 3h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.09 10.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 17z"/></svg>,
+  arrowR:  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>,
+  arrowL:  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
+  lock:    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  check:   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  checkLg: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  upload:  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+  home:    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  warn:    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>,
+  doc:     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/></svg>,
+  info:    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>,
+  userChk: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>,
+  userPlus:<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>,
+  zap:     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+  search:  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg>,
+  send:    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+  star:    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  video:   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>,
+  x:       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>,
+  image:   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
+  /* footer strip icons */
+  tool:    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
+  mapPin:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
+  clock:   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  award:   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>,
+};
+
+/* ══ CHOICE ICON MAP — replaces emojis ══ */
+const choiceIcon = (key, size=20, color="currentColor") => {
+  const s = {width:size,height:size,flexShrink:0};
+  const p = {fill:"none",stroke:color,strokeWidth:"1.5",strokeLinecap:"round",strokeLinejoin:"round"};
+  switch(key){
+    case "off":       return <svg style={s} viewBox="0 0 24 24" {...p}><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>;
+    case "zap":       return <svg style={s} viewBox="0 0 24 24" {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
+    case "sun-dim":   return <svg style={s} viewBox="0 0 24 24" {...p}><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>;
+    case "layout":    return <svg style={s} viewBox="0 0 24 24" {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>;
+    case "type":      return <svg style={s} viewBox="0 0 24 24" {...p}><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>;
+    case "letter":    return <svg style={s} viewBox="0 0 24 24" {...p}><line x1="4" y1="20" x2="10" y2="4"/><line x1="20" y1="20" x2="14" y2="4"/><line x1="6.9" y1="14" x2="17.1" y2="14"/></svg>;
+    case "minus-square": return <svg style={s} viewBox="0 0 24 24" {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>;
+    case "columns":   return <svg style={s} viewBox="0 0 24 24" {...p}><rect x="3" y="3" width="8" height="18" rx="1"/><rect x="13" y="3" width="8" height="18" rx="1"/></svg>;
+    case "grid":      return <svg style={s} viewBox="0 0 24 24" {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>;
+    case "repeat":    return <svg style={s} viewBox="0 0 24 24" {...p}><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>;
+    case "shuffle":   return <svg style={s} viewBox="0 0 24 24" {...p}><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>;
+    case "play":      return <svg style={s} viewBox="0 0 24 24" {...p}><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>;
+    case "map-pin":   return <svg style={s} viewBox="0 0 24 24" {...p}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>;
+    default: return <svg style={s} viewBox="0 0 24 24" {...p}><circle cx="12" cy="12" r="1"/></svg>;
+  }
+};
+
+/* ══ PROGRESS BAR ══ */
+const ProgressBar = ({progress, label}) => (
+  <div style={{width:"100%"}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+      <span style={{fontSize:11,fontWeight:600,color:T.blue,letterSpacing:"0.06em",textTransform:"uppercase"}}>{label}</span>
+      <span style={{fontSize:13,fontWeight:600,color:T.blue}}>{Math.round(progress)}%</span>
+    </div>
+    <div style={{height:4,background:T.border,borderRadius:4,overflow:"hidden"}}>
+      <div style={{height:"100%",width:`${progress}%`,background:`linear-gradient(90deg,${T.blue},${T.amber})`,borderRadius:4,transition:"width 0.5s cubic-bezier(0.4,0,0.2,1)",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent)",backgroundSize:"200% 100%",animation:"shimmer 2s infinite"}}/>
+      </div>
+    </div>
+  </div>
+);
+
+/* ══ CHOICE CARD ══ */
+const ChoiceCard = ({choice, onClick, selected}) => {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={()=>setHov(true)}
+      onMouseLeave={()=>setHov(false)}
+      style={{
+        background: selected ? T.blueLight : T.white,
+        border:`1.5px solid ${selected ? T.blue : hov ? "#9CA3AF" : T.border}`,
+        borderRadius:12, padding:"14px 16px", cursor:"pointer",
+        textAlign:"left", display:"flex", alignItems:"center", gap:14,
+        width:"100%", transition:"border-color 0.15s, background 0.15s",
+        boxShadow: selected ? "none" : T.shadow,
+      }}
+    >
+      <div style={{flexShrink:0,color:selected?T.blue:T.gray5,transition:"color 0.15s"}}>
+        {choiceIcon(choice.icon, 20, selected ? T.blue : T.gray5)}
+      </div>
+      <div style={{flex:1}}>
+        <div style={{fontSize:14,fontWeight:600,color:selected?T.blue:T.black,lineHeight:1.35,transition:"color 0.15s"}}>{choice.label}</div>
+        {choice.sublabel && <div style={{fontSize:12,color:T.gray4,marginTop:2,fontWeight:400}}>{choice.sublabel}</div>}
+      </div>
+      <div style={{width:18,height:18,borderRadius:"50%",border:`1.5px solid ${selected?T.blue:T.border}`,background:selected?T.blue:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>
+        {selected && <div style={{color:T.white,lineHeight:0}}>{IC.check}</div>}
+      </div>
+    </button>
+  );
+};
+
+/* ══ SCREEN: LANDING ══ */
+const Landing = ({onStart}) => {
+  const [vis, setVis] = useState(false);
+  useEffect(()=>{setTimeout(()=>setVis(true),60)},[]);
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",background:T.white}}>
+      {/* Header */}
+      <header style={{padding:"0 40px",height:64,display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${T.border}`,position:"sticky",top:0,background:T.white,zIndex:50}}>
+        <img src="atelier gambetta logo.png" alt="Atelier Gambetta" style={{height:36,display:"block",objectFit:"contain"}} />
+        <a href="tel:0148404422" style={{display:"flex",alignItems:"center",gap:8,textDecoration:"none",color:T.blue,fontSize:14,fontWeight:600}}>
+          {IC.phone}<span>01 48 40 44 22</span>
+        </a>
+      </header>
+
+      {/* Hero */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"80px 24px 64px",textAlign:"center",opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(20px)",transition:"opacity 0.5s ease, transform 0.5s ease"}}>
+
+        {/* Badge */}
+        <div style={{display:"inline-flex",alignItems:"center",gap:8,background:T.blueLight,borderRadius:50,padding:"7px 16px",marginBottom:36}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.blue} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span style={{fontSize:13,fontWeight:600,color:T.blue,letterSpacing:"0.01em"}}>Diagnostic gratuit · 2 minutes</span>
+        </div>
+
+        {/* H1 */}
+        <h1 style={{fontSize:"clamp(40px,5.5vw,72px)",fontWeight:700,color:T.blue,lineHeight:1.05,letterSpacing:"-0.02em",maxWidth:720,marginBottom:20}}>
+          Votre enseigne est<br/>
+          <span style={{color:T.amber}}>cassée ?</span>
+        </h1>
+
+        {/* Subtitle */}
+        <p style={{fontSize:"clamp(16px,1.8vw,18px)",color:T.gray5,maxWidth:480,lineHeight:1.7,marginBottom:52,fontWeight:400}}>
+          Identifiez la panne en 2 minutes et recevez une estimation de réparation. Nos techniciens vous rappellent sous 24h.
+        </p>
+
+        {/* Stats row */}
+        <div className="stats-row" style={{display:"flex",alignItems:"center",gap:32,marginBottom:52,flexWrap:"wrap",justifyContent:"center"}}>
+          {[{v:"50 ans",l:"D'EXPERTISE"},{v:"1 000+",l:"ENSEIGNES / AN"},{v:"4.8",l:"189 AVIS GOOGLE"},{v:"24h",l:"DÉLAI DE RAPPEL"}].map((s,i)=>(
+            <React.Fragment key={i}>
+              {i>0 && <div className="stat-divider" style={{width:1,height:32,background:T.border,flexShrink:0}}/>}
+              <div style={{textAlign:"center"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+                  <span style={{fontSize:26,fontWeight:700,color:T.blue,letterSpacing:"-0.01em"}}>{s.v}</span>
+                  {s.l==="189 AVIS GOOGLE" && <span style={{color:T.amber,lineHeight:0}}>{IC.star}</span>}
+                </div>
+                <div style={{fontSize:11,color:T.gray4,letterSpacing:"0.06em",marginTop:3,fontWeight:400}}>{s.l}</div>
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <button onClick={onStart} style={{
+          background:T.amber, color:T.blue, border:"none", borderRadius:50,
+          padding:"0 40px", height:56, fontSize:16, fontWeight:700,
+          cursor:"pointer", display:"inline-flex", alignItems:"center", gap:10,
+          transition:"background 0.15s", letterSpacing:"0.01em",
+          boxShadow:`0 1px 2px rgba(0,0,0,0.08)`,
+        }}
+        onMouseEnter={e=>e.currentTarget.style.background=T.amberHover}
+        onMouseLeave={e=>e.currentTarget.style.background=T.amber}
+        >
+          {IC.search}
+          Diagnostiquer mon enseigne gratuitement
+          {IC.arrowR}
+        </button>
+
+        {/* Trust */}
+        <div style={{display:"flex",alignItems:"center",gap:6,marginTop:16,color:T.gray4,fontSize:13}}>
+          {IC.lock} Gratuit · Sans engagement · Réponse sous 24h
+        </div>
+
+        {/* Checkmarks */}
+        <div style={{display:"flex",gap:24,marginTop:48,flexWrap:"wrap",justifyContent:"center"}}>
+          {["N°1 des enseignes à Paris","Fabricant depuis 1975","Atelier à Romainville (93)","Île-de-France"].map((t,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:14,color:T.gray5,fontWeight:400}}>
+              <span style={{color:T.green,lineHeight:0}}>{IC.check}</span>{t}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom strip */}
+      <div style={{background:T.blue,padding:"16px 40px",display:"flex",justifyContent:"center",gap:40,flexWrap:"wrap"}}>
+        {[
+          [IC.award,"50 ans d'expertise"],
+          [IC.zap,"Intervention rapide"],
+          [IC.mapPin,"Romainville (93)"],
+          [IC.clock,"Rappel sous 24h"],
+        ].map(([icon,label],i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,color:"rgba(255,255,255,0.7)",fontSize:13}}>
+            <span style={{opacity:0.7,lineHeight:0}}>{icon}</span>{label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ══ SCREEN: CLIENT TYPE ══ */
+const ClientTypeScreen = ({onSelect}) => {
+  const [vis, setVis] = useState(false);
+  useEffect(()=>{ setTimeout(()=>setVis(true),60) },[]);
+
+  const Card = ({type, icon, title, subtitle, desc}) => {
+    const [hov, setHov] = useState(false);
+    const [sel, setSel] = useState(false);
+    return (
+      <button
+        onClick={()=>{ setSel(true); setTimeout(()=>onSelect(type), 120); }}
+        onMouseEnter={()=>setHov(true)}
+        onMouseLeave={()=>setHov(false)}
+        style={{
+          background: sel ? T.blueLight : T.white,
+          border:`1.5px solid ${sel ? T.blue : hov ? "rgba(34,71,97,0.4)" : T.border}`,
+          borderRadius:14, padding:"28px 24px", cursor:"pointer",
+          textAlign:"center", flex:"1 1 220px", display:"flex",
+          flexDirection:"column", alignItems:"center", gap:16,
+          transition:"border-color 0.15s, background 0.15s",
+          boxShadow: T.shadow,
+        }}
+      >
+        <div style={{width:52,height:52,borderRadius:12,background:T.blueLight,display:"flex",alignItems:"center",justifyContent:"center",color:T.blue}}>
+          {icon}
+        </div>
+        <div>
+          <div style={{fontSize:16,fontWeight:700,color:T.blue,marginBottom:6,lineHeight:1.25}}>{title}</div>
+          <div style={{fontSize:13,color:T.gray5,lineHeight:1.55,fontWeight:400}}>{subtitle}</div>
+          {desc && <div style={{fontSize:12,color:T.gray4,marginTop:6,fontWeight:400}}>{desc}</div>}
+        </div>
+        <div style={{
+          display:"inline-flex",alignItems:"center",gap:6,
+          padding:"8px 20px",borderRadius:50,fontSize:13,fontWeight:600,
+          background:T.blue,color:T.white,
+          transition:"background 0.15s",
+        }}>
+          Continuer {IC.arrowR}
+        </div>
+      </button>
+    );
+  };
+
+  return (
+    <div style={{opacity:vis?1:0,transition:"opacity 0.3s ease",animation:vis?"fadeUp 0.35s ease both":"none"}}>
+      <div style={{marginBottom:28}}>
+        <h2 style={{fontSize:22,fontWeight:700,color:T.blue,marginBottom:8}}>Êtes-vous déjà client ?</h2>
+        <p style={{fontSize:14,color:T.gray5,fontWeight:400,lineHeight:1.6}}>Votre réponse nous permet d'adapter le formulaire de contact.</p>
+      </div>
+      <div className="client-cards" style={{display:"flex",gap:14}}>
+        <Card
+          type={true}
+          icon={IC.userChk}
+          title="Oui, je suis client Atelier Gambetta"
+          subtitle="Nous avons déjà travaillé ensemble. Formulaire simplifié."
+          desc="4 champs uniquement"
+        />
+        <Card
+          type={false}
+          icon={IC.userPlus}
+          title="Non, je suis nouveau client"
+          subtitle="Quelques informations pour vous contacter et envoyer votre devis."
+          desc="Devis estimatif par email"
+        />
+      </div>
+    </div>
+  );
+};
+
+/* ══ SCREEN: QUESTION ══ */
+const QuestionStep = ({stepKey, onAnswer}) => {
+  const [sel, setSel] = useState(null);
+  const [vis, setVis] = useState(false);
+  useEffect(()=>{ setVis(false); setSel(null); setTimeout(()=>setVis(true),60); },[stepKey]);
+  const step = TREE[stepKey];
+  if(!step || step.type!=="choice") return null;
+  const handle = (choice) => { setSel(choice.id); setTimeout(()=>onAnswer(choice), 260); };
+  return (
+    <div style={{opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(12px)",transition:"opacity 0.3s ease,transform 0.3s ease"}}>
+      <h2 style={{fontSize:20,fontWeight:700,color:T.blue,marginBottom:6,lineHeight:1.3}}>{step.question}</h2>
+      {step.subtitle && <p style={{fontSize:13,color:T.gray5,marginBottom:20,fontWeight:400}}>{step.subtitle}</p>}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {step.choices.map(c=><ChoiceCard key={c.id} choice={c} selected={sel===c.id} onClick={()=>handle(c)} />)}
+      </div>
+    </div>
+  );
+};
+
+/* ══ SCREEN: UPLOAD ══ */
+const UploadStep = ({onNext, isUrgent}) => {
+  const [vis, setVis] = useState(false);
+  const [files, setFiles] = useState([]);
+  const [drag, setDrag] = useState(false);
+  const inputRef = useRef();
+  useEffect(()=>{ setTimeout(()=>setVis(true),60); },[]);
+  const addFiles = (fl) => {
+    const arr = Array.from(fl).map(f=>({file:f,name:f.name,preview:f.type.startsWith("image/")?URL.createObjectURL(f):null}));
+    setFiles(p=>[...p,...arr]);
+  };
+  return (
+    <div style={{opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(12px)",transition:"opacity 0.3s ease,transform 0.3s ease"}}>
+      {isUrgent && (
+        <div style={{background:T.redLight,border:`1px solid ${T.red}44`,borderRadius:10,padding:"12px 14px",marginBottom:18,display:"flex",gap:10,alignItems:"center"}}>
+          <span style={{color:T.red,flexShrink:0}}>{IC.warn}</span>
+          <div><div style={{fontSize:13,fontWeight:600,color:T.red}}>Situation urgente détectée</div><div style={{fontSize:12,color:T.gray5}}>Un technicien vous contactera en priorité.</div></div>
+        </div>
+      )}
+      <h2 style={{fontSize:20,fontWeight:700,color:T.blue,marginBottom:6}}>Montrez-nous le problème</h2>
+      <p style={{fontSize:13,color:T.gray5,marginBottom:20,lineHeight:1.65,fontWeight:400}}>
+        Une photo aide nos experts à évaluer la panne avant de se déplacer. <span style={{color:T.gray4}}>(optionnel)</span>
+      </p>
+      <div
+        onDragOver={e=>{e.preventDefault();setDrag(true)}}
+        onDragLeave={()=>setDrag(false)}
+        onDrop={e=>{e.preventDefault();setDrag(false);addFiles(e.dataTransfer.files)}}
+        onClick={()=>inputRef.current?.click()}
+        style={{
+          border:`1.5px dashed ${drag?T.amber:T.border}`,
+          borderRadius:12,padding:"36px 24px",textAlign:"center",
+          background:drag?"#FFFBEB":T.bg,cursor:"pointer",
+          transition:"border-color 0.15s, background 0.15s",marginBottom:14,
+        }}
+      >
+        <div style={{color:T.gray4,display:"flex",justifyContent:"center",marginBottom:10}}>{IC.upload}</div>
+        <div style={{fontSize:14,fontWeight:600,color:T.blue,marginBottom:4}}>{drag?"Déposez ici":"Glisser-déposer une photo ou vidéo"}</div>
+        <div style={{fontSize:12,color:T.gray4}}>ou <span style={{color:T.blue,fontWeight:600,cursor:"pointer"}}>cliquez pour choisir</span> — JPG, PNG, MP4</div>
+        <input ref={inputRef} type="file" multiple accept="image/*,video/*" style={{display:"none"}} onChange={e=>addFiles(e.target.files)} />
+      </div>
+      {files.length > 0 && (
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+          {files.map((f,i)=>(
+            <div key={i} style={{position:"relative",width:68,height:68,borderRadius:8,overflow:"hidden",border:`1px solid ${T.border}`}}>
+              {f.preview ? <img src={f.preview} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                : <div style={{width:"100%",height:"100%",background:T.blueLight,display:"flex",alignItems:"center",justifyContent:"center",color:T.blue}}>{IC.video}</div>}
+              <button onClick={e=>{e.stopPropagation();setFiles(p=>p.filter((_,j)=>j!==i))}} style={{position:"absolute",top:3,right:3,width:18,height:18,borderRadius:"50%",background:"rgba(0,0,0,0.5)",color:"white",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{IC.x}</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button onClick={()=>onNext({files})} style={{
+        background:T.amber, color:T.blue, border:"none", borderRadius:50,
+        padding:"0 32px", height:52, fontSize:14, fontWeight:700,
+        cursor:"pointer", width:"100%", display:"flex", alignItems:"center",
+        justifyContent:"center", gap:9, transition:"background 0.15s",
+      }}
+      onMouseEnter={e=>e.currentTarget.style.background=T.amberHover}
+      onMouseLeave={e=>e.currentTarget.style.background=T.amber}
+      >
+        {files.length > 0 ? `Continuer avec ${files.length} fichier${files.length>1?"s":""}` : "Continuer sans photo"}
+        {IC.arrowR}
+      </button>
+      <p style={{fontSize:12,color:T.gray4,textAlign:"center",marginTop:10,display:"flex",alignItems:"center",gap:5,justifyContent:"center"}}>
+        {IC.lock} Upload optionnel — continuez sans si vous préférez
+      </p>
+    </div>
+  );
+};
+
+/* ══ SCREEN: INFOS PERSO ══ */
+const InfosPerso = ({existingClient, onNext}) => {
+  const [vis, setVis] = useState(false);
+  const [data, setData] = useState({prenom:"",nom:"",email:"",telephone:"",numeroClient:"",societe:"",adresseRue:"",adresseCP:"",adresseVille:"",memeAdresse:true,projetRue:"",projetCP:"",projetVille:""});
+  const [errors, setErrors] = useState({});
+  useEffect(()=>{ setTimeout(()=>setVis(true),60); },[]);
+  const upd = (k,v) => setData(d=>({...d,[k]:v}));
+  const validate = () => {
+    const e={};
+    if(!data.prenom.trim()) e.prenom=true;
+    if(!data.nom.trim()) e.nom=true;
+    if(!data.telephone.trim()) e.telephone=true;
+    if(existingClient && !data.numeroClient.trim()) e.numeroClient=true;
+    if(!existingClient && !data.email.trim()) e.email=true;
+    if(!existingClient && !data.adresseRue.trim()) e.adresseRue=true;
+    if(!existingClient && !data.adresseCP.trim()) e.adresseCP=true;
+    if(!existingClient && !data.adresseVille.trim()) e.adresseVille=true;
+    return e;
+  };
+  const submit = () => { const e=validate(); if(Object.keys(e).length>0){setErrors(e);return;} onNext(data); };
+
+  const Field = ({label,required,k,type="text",placeholder}) => (
+    <div style={{marginBottom:14}}>
+      <label style={{fontSize:11,fontWeight:600,color:T.blue,display:"block",marginBottom:5,letterSpacing:"0.05em",textTransform:"uppercase"}}>{label}{required&&<span style={{color:T.red}}> *</span>}</label>
+      <input type={type} value={data[k]} onChange={e=>upd(k,e.target.value)} placeholder={placeholder}
+        style={{width:"100%",padding:"11px 13px",borderRadius:8,border:`1.5px solid ${errors[k]?T.red:T.border}`,fontSize:14,color:T.black,outline:"none",transition:"border-color 0.15s",background:T.white,fontWeight:400}}
+        onFocus={e=>e.target.style.borderColor=errors[k]?T.red:T.blue}
+        onBlur={e=>e.target.style.borderColor=errors[k]?T.red:T.border}
+      />
+    </div>
+  );
+
+  return (
+    <div style={{opacity:vis?1:0,transition:"opacity 0.3s ease"}}>
+      <div style={{marginBottom:24}}>
+        <div style={{display:"inline-flex",alignItems:"center",gap:6,background:T.blueLight,borderRadius:6,padding:"4px 10px",marginBottom:10}}>
+          <span style={{fontSize:11,fontWeight:600,color:T.blue,letterSpacing:"0.04em"}}>{existingClient?"CLIENT EXISTANT":"NOUVEAU CLIENT"}</span>
+        </div>
+        <h2 style={{fontSize:20,fontWeight:700,color:T.blue,marginBottom:6}}>{existingClient?"Confirmez vos coordonnées":"Plus qu'une étape !"}</h2>
+        <p style={{fontSize:13,color:T.gray5,fontWeight:400,lineHeight:1.6}}>
+          {existingClient?"Vos informations nous permettront de retrouver votre dossier.":"Renseignez vos coordonnées pour recevoir votre estimation par email."}
+        </p>
+      </div>
+      <div className="grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px"}}>
+        <Field label="Prénom" required k="prenom" placeholder="Marie"/>
+        <Field label="Nom" required k="nom" placeholder="Dupont"/>
+      </div>
+      <Field label="Téléphone" required k="telephone" type="tel" placeholder="06 12 34 56 78"/>
+      {existingClient ? (
+        <Field label="N° client / société" required k="numeroClient" placeholder="AG-00123 ou nom de société"/>
+      ) : (<>
+        <Field label="Email professionnel" required k="email" type="email" placeholder="marie@moncommerce.fr"/>
+        <Field label="Nom de la société" k="societe" placeholder="Mon Commerce SARL"/>
+        <div style={{marginBottom:14}}>
+          <label style={{fontSize:11,fontWeight:600,color:T.blue,display:"block",marginBottom:5,letterSpacing:"0.05em",textTransform:"uppercase"}}>Adresse de facturation <span style={{color:T.red}}>*</span></label>
+          <input value={data.adresseRue} onChange={e=>upd("adresseRue",e.target.value)} placeholder="12 rue du Commerce"
+            style={{width:"100%",padding:"11px 13px",borderRadius:8,border:`1.5px solid ${errors.adresseRue?T.red:T.border}`,fontSize:14,color:T.black,outline:"none",background:T.white,marginBottom:8,fontFamily:"inherit",fontWeight:400}}
+            onFocus={e=>e.target.style.borderColor=T.blue} onBlur={e=>e.target.style.borderColor=errors.adresseRue?T.red:T.border}
+          />
+          <div style={{display:"grid",gridTemplateColumns:"100px 1fr",gap:8}}>
+            <input value={data.adresseCP} onChange={e=>upd("adresseCP",e.target.value)} placeholder="75011"
+              style={{padding:"11px 13px",borderRadius:8,border:`1.5px solid ${errors.adresseCP?T.red:T.border}`,fontSize:14,color:T.black,outline:"none",background:T.white,fontFamily:"inherit",fontWeight:400}}
+              onFocus={e=>e.target.style.borderColor=T.blue} onBlur={e=>e.target.style.borderColor=errors.adresseCP?T.red:T.border}
+            />
+            <input value={data.adresseVille} onChange={e=>upd("adresseVille",e.target.value)} placeholder="Paris"
+              style={{padding:"11px 13px",borderRadius:8,border:`1.5px solid ${errors.adresseVille?T.red:T.border}`,fontSize:14,color:T.black,outline:"none",background:T.white,fontFamily:"inherit",fontWeight:400}}
+              onFocus={e=>e.target.style.borderColor=T.blue} onBlur={e=>e.target.style.borderColor=errors.adresseVille?T.red:T.border}
+            />
+          </div>
+          {(errors.adresseRue||errors.adresseCP||errors.adresseVille)&&<div style={{fontSize:11,color:T.red,marginTop:3}}>Adresse complète requise</div>}
+        </div>
+        <label style={{display:"flex",alignItems:"center",gap:9,marginBottom:16,cursor:"pointer"}} onClick={()=>upd("memeAdresse",!data.memeAdresse)}>
+          <div style={{width:17,height:17,borderRadius:4,border:`1.5px solid ${data.memeAdresse?T.blue:T.border}`,background:data.memeAdresse?T.blue:T.white,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s",color:T.white}}>
+            {data.memeAdresse && IC.check}
+          </div>
+          <span style={{fontSize:13,color:T.gray5,fontWeight:400}}>Adresse du projet identique à l'adresse de facturation</span>
+        </label>
+        {!data.memeAdresse && (
+          <div style={{marginBottom:16}}>
+            <label style={{fontSize:11,fontWeight:600,color:T.blue,display:"block",marginBottom:5,letterSpacing:"0.05em",textTransform:"uppercase"}}>Adresse du projet</label>
+            <input value={data.projetRue} onChange={e=>upd("projetRue",e.target.value)} placeholder="Adresse de l'enseigne"
+              style={{width:"100%",padding:"11px 13px",borderRadius:8,border:`1.5px solid ${T.border}`,fontSize:14,color:T.black,outline:"none",background:T.white,marginBottom:8,fontFamily:"inherit",fontWeight:400}}/>
+            <div style={{display:"grid",gridTemplateColumns:"100px 1fr",gap:8}}>
+              <input value={data.projetCP} onChange={e=>upd("projetCP",e.target.value)} placeholder="75011"
+                style={{padding:"11px 13px",borderRadius:8,border:`1.5px solid ${T.border}`,fontSize:14,color:T.black,outline:"none",background:T.white,fontFamily:"inherit",fontWeight:400}}/>
+              <input value={data.projetVille} onChange={e=>upd("projetVille",e.target.value)} placeholder="Paris"
+                style={{padding:"11px 13px",borderRadius:8,border:`1.5px solid ${T.border}`,fontSize:14,color:T.black,outline:"none",background:T.white,fontFamily:"inherit",fontWeight:400}}/>
+            </div>
+          </div>
+        )}
+      </>)}
+      <button onClick={submit} style={{
+        background:T.blue, color:T.white, border:"none", borderRadius:50,
+        padding:"0 32px", height:52, fontSize:14, fontWeight:700,
+        cursor:"pointer", width:"100%", marginTop:8,
+        display:"flex", alignItems:"center", justifyContent:"center", gap:9,
+        transition:"background 0.15s",
+      }}
+      onMouseEnter={e=>e.currentTarget.style.background=T.blueMid}
+      onMouseLeave={e=>e.currentTarget.style.background=T.blue}
+      >
+        {IC.send} Recevoir mon estimation gratuite
+      </button>
+      <p style={{fontSize:12,color:T.gray4,textAlign:"center",marginTop:10,display:"flex",alignItems:"center",gap:5,justifyContent:"center"}}>
+        {IC.lock} Données confidentielles
+      </p>
+    </div>
+  );
+};
+
+/* ══ SCREEN: CONFIRMATION ══ */
+const Confirmation = ({diagnosticSummary,infos,isUrgent,priceRange}) => {
+  const [vis, setVis] = useState(false);
+  const [ticketVis, setTicketVis] = useState(false);
+  useEffect(()=>{
+    setTimeout(()=>setVis(true),80);
+    setTimeout(()=>setTicketVis(true),550);
+    const emailData = {
+      to:infos?.email||"N/A",
+      subject:"Votre diagnostic Atelier Gambetta — Estimation sous 24h",
+      body:[
+        `Bonjour ${infos?.prenom||""},`,
+        "","Merci pour votre diagnostic Atelier Gambetta.","",
+        "Récapitulatif :",...diagnosticSummary.map(d=>`  • ${d.question} → ${d.answer}`),"",
+        priceRange?`Estimation : ${priceRange.min}€ – ${priceRange.max}€ HT\nDevis définitif après inspection.`:"Devis après inspection sur site.","",
+        "Nos experts vous rappellent sous 24h — 01 48 40 44 22","","Atelier Gambetta",
+      ].join("\n"),
+    };
+    console.log("[EmailJS simulation]", emailData);
+  },[]);
+
+  return (
+    <div style={{textAlign:"center",opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(14px)",transition:"opacity 0.5s ease,transform 0.5s ease"}}>
+      <div style={{width:64,height:64,borderRadius:"50%",background:T.greenLight,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",animation:"checkIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both",color:T.green}}>
+        {IC.checkLg}
+      </div>
+      <h2 style={{fontSize:22,fontWeight:700,color:T.blue,marginBottom:8}}>Diagnostic envoyé !</h2>
+      <p style={{fontSize:14,color:T.gray5,maxWidth:400,margin:"0 auto",lineHeight:1.7,marginBottom:24,fontWeight:400}}>
+        Merci <strong style={{color:T.blue,fontWeight:600}}>{infos?.prenom||""}</strong>. Nos experts analysent votre demande et vous recontactent sous <strong style={{color:T.amber,fontWeight:600}}>24h</strong>.
+      </p>
+
+      {/* Ticket devis */}
+      {priceRange && (
+        <div style={{
+          background:T.white, border:`1px solid ${T.border}`,
+          borderRadius:12, padding:"20px", marginBottom:16, textAlign:"left",
+          opacity:ticketVis?1:0,
+          animation:ticketVis?"ticketIn 0.4s ease both":"none",
+          boxShadow:T.shadow,
+          position:"relative", overflow:"hidden",
+        }}>
+          <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,${T.blue},${T.amber})`}}/>
+          <div style={{borderBottom:`1px solid ${T.border}`,paddingBottom:12,marginBottom:12}}>
+            <div style={{fontSize:10,fontWeight:700,color:T.gray4,letterSpacing:"0.1em",marginBottom:2}}>DEVIS ESTIMATIF</div>
+            <div style={{fontSize:13,color:T.gray5,fontWeight:400}}>{priceRange.label}</div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <div style={{fontSize:10,color:T.gray4,letterSpacing:"0.05em",marginBottom:2,fontWeight:400}}>FOURCHETTE ESTIMÉE</div>
+              <div style={{fontSize:28,fontWeight:700,color:T.blue,lineHeight:1}}>
+                {priceRange.min}€ – {priceRange.max}€<span style={{fontSize:12,fontWeight:400,color:T.gray4}}> HT</span>
+              </div>
+            </div>
+            <div style={{width:44,height:44,borderRadius:10,background:T.blueLight,display:"flex",alignItems:"center",justifyContent:"center",color:T.blue}}>{IC.doc}</div>
+          </div>
+          <div style={{marginTop:12,padding:"8px 12px",background:T.bg,borderRadius:8,fontSize:12,color:T.gray5,display:"flex",alignItems:"center",gap:6,fontWeight:400}}>
+            <span style={{color:T.amber}}>{IC.info}</span> Devis définitif établi après inspection sur site
+          </div>
+        </div>
+      )}
+
+      {!priceRange && (
+        <div style={{background:T.blueLight,borderRadius:10,padding:16,marginBottom:16,textAlign:"left",border:`1px solid ${T.border}`}}>
+          <div style={{fontSize:10,color:T.gray4,marginBottom:2,letterSpacing:"0.05em",fontWeight:400}}>ESTIMATION</div>
+          <div style={{fontSize:14,fontWeight:600,color:T.blue}}>Devis personnalisé après inspection</div>
+          <div style={{fontSize:12,color:T.gray5,marginTop:2,fontWeight:400}}>Nos experts vous contactent sous 24h.</div>
+        </div>
+      )}
+
+      {/* Récap */}
+      <div style={{background:T.bg,borderRadius:10,padding:16,marginBottom:16,textAlign:"left",border:`1px solid ${T.border}`}}>
+        <div style={{fontSize:10,fontWeight:600,color:T.gray4,marginBottom:10,letterSpacing:"0.08em"}}>RÉCAPITULATIF</div>
+        {diagnosticSummary.map((item,i)=>(
+          <div key={i} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:i<diagnosticSummary.length-1?`1px solid ${T.border}`:"none"}}>
+            <span style={{color:T.blue,flexShrink:0,marginTop:1}}>{choiceIcon(item.icon||"dot",16,T.blue)}</span>
+            <div>
+              <div style={{fontSize:11,color:T.gray4,fontWeight:400}}>{item.question}</div>
+              <div style={{fontSize:13,fontWeight:600,color:T.blue}}>{item.answer}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {isUrgent && (
+        <div style={{background:T.redLight,border:`1px solid ${T.red}33`,borderRadius:10,padding:"11px 14px",marginBottom:16,display:"flex",gap:9,alignItems:"center",textAlign:"left"}}>
+          <span style={{color:T.red,flexShrink:0}}>{IC.warn}</span>
+          <div>
+            <div style={{fontSize:13,fontWeight:600,color:T.red}}>Situation urgente — Rappel prioritaire</div>
+            <div style={{fontSize:12,color:T.gray5,marginTop:1,fontWeight:400}}>Si besoin immédiat : <strong style={{color:T.blue}}>01 48 40 44 22</strong></div>
+          </div>
+        </div>
+      )}
+
+      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+        <a href="https://www.ateliergambetta.com" style={{display:"inline-flex",alignItems:"center",gap:7,background:T.blue,color:T.white,borderRadius:50,padding:"0 22px",height:44,fontSize:13,fontWeight:600,textDecoration:"none"}}>
+          {IC.home} Retour au site
+        </a>
+        <a href="tel:0148404422" style={{display:"inline-flex",alignItems:"center",gap:7,background:T.white,color:T.blue,border:`1.5px solid ${T.blue}`,borderRadius:50,padding:"0 22px",height:44,fontSize:13,fontWeight:600,textDecoration:"none"}}>
+          {IC.phone} Appeler l'atelier
+        </a>
+      </div>
+      {infos?.email && <p style={{fontSize:12,color:T.gray4,marginTop:14,fontWeight:400}}>Email de confirmation envoyé à <strong style={{color:T.blue,fontWeight:600}}>{infos.email}</strong></p>}
+    </div>
+  );
+};
+
+/* ══ MAIN APP ══ */
+function App() {
+  const [screen, setScreen] = useState("landing");
+  const [existingClient, setExistingClient] = useState(null);
+  const [infos, setInfos] = useState({});
+  const [history, setHistory] = useState([]);
+  const [currentStep, setCurrentStep] = useState("lumineux_symptome");
+  const [diagnosticSummary, setDiagnosticSummary] = useState([]);
+  const [isUrgent, setIsUrgent] = useState(false);
+
+  const getProgress = () => {
+    if(screen==="landing") return 0;
+    if(screen==="clientType") return 12;
+    if(screen==="confirm") return 100;
+    if(screen==="infos") return 90;
+    if(screen==="upload") return 76;
+    return Math.min(72, 20 + history.length*(50/TOTAL_STEPS));
+  };
+  const getLabel = () => ({clientType:"Identification",diagnostic:"Diagnostic en cours",upload:"Photo",infos:"Vos coordonnées",confirm:"Terminé"}[screen]||"");
+
+  const handleAnswer = (choice) => {
+    const step = TREE[currentStep]; if(!step) return;
+    setDiagnosticSummary(p=>[...p,{question:step.question,answer:choice.label,icon:choice.icon}]);
+    setHistory(p=>[...p,{stepKey:currentStep,choiceId:choice.id}]);
+    if(choice.urgent) setIsUrgent(true);
+    const nk=choice.next;
+    if(!nk||nk==="upload") setScreen("upload"); else setCurrentStep(nk);
+  };
+
+  const handleBack = () => {
+    if(screen==="infos"){setScreen("upload");return;}
+    if(screen==="upload"){
+      if(history.length>0){const l=history[history.length-1].stepKey;setHistory(h=>h.slice(0,-1));setDiagnosticSummary(s=>s.slice(0,-1));setCurrentStep(l);setScreen("diagnostic");}
+      else{setCurrentStep("lumineux_symptome");setScreen("clientType");}
+      return;
+    }
+    if(screen==="diagnostic"){
+      if(history.length===0){setCurrentStep("lumineux_symptome");setScreen("clientType");}
+      else{const prev=history[history.length-1].stepKey;setHistory(h=>h.slice(0,-1));setDiagnosticSummary(s=>s.slice(0,-1));setCurrentStep(prev);}
+      return;
+    }
+    if(screen==="clientType"){setScreen("landing");return;}
+  };
+
+  const priceRange = getPriceRange(history);
+  if(screen==="landing") return <Landing onStart={()=>setScreen("clientType")} />;
+
+  return (
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",flexDirection:"column"}}>
+      {/* Header */}
+      <header style={{background:T.white,borderBottom:`1px solid ${T.border}`,padding:"0 24px",height:58,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
+        <img src="atelier gambetta logo.png" alt="Atelier Gambetta" style={{height:32,display:"block",objectFit:"contain"}} />
+        {screen!=="confirm" && (
+          <div style={{flex:1,maxWidth:440,margin:"0 24px"}}>
+            <ProgressBar progress={getProgress()} label={getLabel()} />
+          </div>
+        )}
+        <a href="tel:0148404422" className="hide-mobile" style={{display:"flex",alignItems:"center",gap:7,textDecoration:"none",color:T.blue,fontSize:13,fontWeight:600}}>
+          {IC.phone}<span>01 48 40 44 22</span>
+        </a>
+      </header>
+
+      {/* Content */}
+      <div style={{flex:1,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"32px 16px 56px"}}>
+        <div style={{width:"100%",maxWidth:580,background:T.white,borderRadius:16,boxShadow:T.shadowMd,padding:"clamp(20px,5vw,40px)"}}>
+          {screen!=="confirm" && (
+            <button onClick={handleBack} style={{display:"flex",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",fontSize:13,color:T.gray4,fontWeight:600,marginBottom:22,padding:0,transition:"color 0.15s"}}
+              onMouseEnter={e=>e.currentTarget.style.color=T.blue}
+              onMouseLeave={e=>e.currentTarget.style.color=T.gray4}
+            >{IC.arrowL} Retour</button>
+          )}
+          {screen==="clientType" && <ClientTypeScreen onSelect={(v)=>{setExistingClient(v);setCurrentStep("lumineux_symptome");setScreen("diagnostic");}} />}
+          {screen==="diagnostic" && <QuestionStep stepKey={currentStep} onAnswer={handleAnswer} />}
+          {screen==="upload" && <UploadStep isUrgent={isUrgent} onNext={()=>setScreen("infos")} />}
+          {screen==="infos" && <InfosPerso existingClient={existingClient} onNext={(d)=>{setInfos(d);setScreen("confirm");}} />}
+          {screen==="confirm" && <Confirmation diagnosticSummary={diagnosticSummary} infos={infos} isUrgent={isUrgent} priceRange={priceRange} existingClient={existingClient} />}
+        </div>
+      </div>
+
+      <footer style={{padding:"12px 28px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6}}>
+        <span style={{fontSize:11,color:T.gray4,fontWeight:400}}>© Atelier Gambetta — Fabricant d'enseignes depuis 1975</span>
+        <span style={{fontSize:11,color:T.gray4,fontWeight:400}}>Propulsé par <strong style={{color:T.blue,fontWeight:600}}>Kyne Agency</strong></span>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
